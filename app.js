@@ -9,9 +9,13 @@ const ExpressError = require("./utils/ExpressError");
 const { wrap } = require("module");
 const session = require("express-session");
 const flash=require("connect-flash");
+const passport=require("passport");
+const LocalStrategy = require("passport-local");
+const User=require("./models/user.js");
 
-const listings = require("./routes/listing.js");
-const reviews = require("./routes/review.js");
+const listingRouters = require("./routes/listing.js");
+const reviewRouters = require("./routes/review.js");
+const userRouters = require("./routes/user.js");
 
 async function main() {
   await mongoose.connect("mongodb://127.0.0.1:27017/wanderlust");
@@ -49,6 +53,13 @@ app.get("/", (req, res) => {
 app.use(session(sessionOptions));
 app.use(flash());
 
+app.use(passport.initialize());
+app.use(passport.session());
+passport.use(new LocalStrategy(User.authenticate()));
+
+passport.serializeUser(User.serializeUser());
+passport.deserializeUser(User.deserializeUser());
+
 // app.get("/testListing",async(req,res)=>{
 //     let sampleListing = new Listing({
 //         title:"My new villa",
@@ -68,9 +79,21 @@ app.use((req,res,next)=>{
   next();
 });
 
-app.use("/listings", listings);
+// app.get("/demouser",async(req,res)=>{
+//   let fakeUser=new User({
+//     email:"student@gmail.com",
+//     username:"sigma-student"
+//   });
 
-app.use("/listings/:id/reviews", reviews);
+//   let registeredUser=await User.register(fakeUser,"helloworld");
+//   res.send(registeredUser);
+// });
+
+app.use("/listings", listingRouters);
+
+app.use("/listings/:id/reviews", reviewRouters);
+
+app.use("/",userRouters);
 
 app.all("/{*any}", (req, res, next) => {
   next(new ExpressError(404, "Page not Found!"));
