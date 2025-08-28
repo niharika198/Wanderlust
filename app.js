@@ -1,3 +1,8 @@
+if (process.env.NODE_ENV != "production") {
+  require("dotenv").config();
+}
+console.log(process.env.secret);
+
 const express = require("express");
 const app = express();
 const mongoose = require("mongoose");
@@ -8,17 +13,20 @@ const wrapAsync = require("./utils/wrapAsync");
 const ExpressError = require("./utils/ExpressError");
 const { wrap } = require("module");
 const session = require("express-session");
-const flash=require("connect-flash");
-const passport=require("passport");
+const MongoStore = require("connect-mongo");
+const flash = require("connect-flash");
+const passport = require("passport");
 const LocalStrategy = require("passport-local");
-const User=require("./models/user.js");
+const User = require("./models/user.js");
 
 const listingRouters = require("./routes/listing.js");
 const reviewRouters = require("./routes/review.js");
 const userRouters = require("./routes/user.js");
 
+const dbUrl = process.env.MONGO_URI;
+
 async function main() {
-  await mongoose.connect("mongodb://127.0.0.1:27017/wanderlust");
+  await mongoose.connect(dbUrl);
 }
 main()
   .then(() => {
@@ -33,22 +41,33 @@ app.use(express.urlencoded({ extended: true }));
 app.use(methodOverride("_method"));
 app.use(express.static(path.join(__dirname, "/public")));
 
+const store = MongoStore.create({
+  mongoUrl: dbUrl,
+  crypto: {
+    secret: process.env.SECRET,
+  },
+  touchAfter: 24 * 3600,
+});
+
+store.on("error", (err) => {
+  console.log("ERROR in MONGO SESSION STORE", err);
+});
+
 const sessionOptions = {
-  secret: "mysupersecretcode",
+  store,
+  secret: process.env.SECRET,
   resave: false,
   saveUninitialized: true,
   cookie: {
-    expires: Date.now() + 7*24*60*60*1000,
+    expires: Date.now() + 7 * 24 * 60 * 60 * 1000,
     maxAge: 7 * 24 * 60 * 60 * 1000,
     httpOnly: true,
   },
 };
 
-
-app.get("/", (req, res) => {
-  res.send("hi! i am root");
-});
-
+// app.get("/", (req, res) => {
+//   res.send("hi! i am root");
+// });
 
 app.use(session(sessionOptions));
 app.use(flash());
@@ -73,9 +92,10 @@ passport.deserializeUser(User.deserializeUser());
 //      res.send("SUCCESSFUL testing")
 // });
 
-app.use((req,res,next)=>{
-  res.locals.success=req.flash("success");
-   res.locals.error=req.flash("error");
+app.use((req, res, next) => {
+  res.locals.success = req.flash("success");
+  res.locals.error = req.flash("error");
+  res.locals.currUser = req.user;
   next();
 });
 
@@ -93,9 +113,9 @@ app.use("/listings", listingRouters);
 
 app.use("/listings/:id/reviews", reviewRouters);
 
-app.use("/",userRouters);
+app.use("/", userRouters);
 
-app.all("/{*any}", (req, res, next) => {
+app.all("*", (req, res, next) => {
   next(new ExpressError(404, "Page not Found!"));
 });
 
@@ -104,6 +124,6 @@ app.use((err, req, res, next) => {
   res.status(status).render("error.ejs", { message });
   // res.status(status).send(message);
 });
-app.listen(8080, () => {
+app.listen(3000, () => {
   console.log("server is listening on port 8080");
 });
