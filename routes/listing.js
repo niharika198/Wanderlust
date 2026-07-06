@@ -10,15 +10,12 @@ const upload = multer({ storage });
 
 const listingController = require("../controllers/listings.js");
 
-router
-  .route("/")
-  .get(wrapAsync(listingController.index))
-  .post(
-    isLoggedIn,
-    validateListing,
-    upload.single("listing[image]"),
-    wrapAsync(listingController.createListing)
-  );
+router.route("/").get(wrapAsync(listingController.index)).post(
+  isLoggedIn,
+  upload.single("listing[image]"), // <-- first
+  validateListing, // <-- then validate
+  wrapAsync(listingController.createListing),
+);
 
 //New Route
 router.get("/new", isLoggedIn, listingController.renderNewForm);
@@ -31,7 +28,7 @@ router
     isOwner,
     upload.single("listing[image]"),
     validateListing,
-    wrapAsync(listingController.updateListing)
+    wrapAsync(listingController.updateListing),
   )
   .delete(isLoggedIn, isOwner, wrapAsync(listingController.destroyListing));
 
@@ -40,7 +37,7 @@ router.get(
   "/:id/edit",
   isLoggedIn,
   isOwner,
-  wrapAsync(listingController.renderEditForm)
+  wrapAsync(listingController.renderEditForm),
 );
 
 module.exports = router;
